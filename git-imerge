@@ -1900,11 +1900,15 @@ class BlockwiseMergeFrontier(MergeFrontier):
         unblocked_block[1, 1].record_blocked(False)
 
     def auto_fill(self):
-        """Try to outline this merge frontier.
+        """Outline this merge frontier to the extent possible.
 
-        Return True iff some progress was made."""
+        Return True iff some progress was made. This method does *not*
+        keep self up to date on any progress; if it returns
+        successfully, you should recompute the frontier from scratch.
 
-        while True:
+        """
+
+        while self:
             best_block = min(self, key=lambda block: (block.len1, block.len2))
 
             try:
@@ -1920,6 +1924,8 @@ class BlockwiseMergeFrontier(MergeFrontier):
                         f.auto_fill()
 
                 return True
+
+        return False
 
     def auto_expand(self):
         """Try pushing out one of the blocks on this frontier.
@@ -2282,11 +2288,6 @@ class Block(object):
             return self.auto_fill_micromerge()
         else:
             merge_frontier = BlockwiseMergeFrontier.initiate_merge(self)
-
-            if not merge_frontier:
-                # Nothing to do.
-                return False
-
             return merge_frontier.auto_fill()
 
     # The codes in the 2D array returned from create_diagram()
