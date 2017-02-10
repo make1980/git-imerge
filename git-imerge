@@ -1709,22 +1709,46 @@ class BlockwiseMergeFrontier(MergeFrontier):
 
         Compute the blocks making up the boundary using bisection (see
         find_frontier_blocks() for more information). Outline the
-        blocks, and return a BlockwiseMergeFrontier reflecting the
+        blocks, then return a BlockwiseMergeFrontier reflecting the
         final result.
 
         """
 
-        merge_frontier = BlockwiseMergeFrontier(
+        frontier = BlockwiseMergeFrontier(
             block, list(find_frontier_blocks(block)),
             )
 
-        if merge_frontier.auto_fill():
-            # Auto-fill doesn't necessarily update its object to
-            # reflect all of the changes it might have made, so we
-            # have to generate a fresh one:
-            merge_frontier = BlockwiseMergeFrontier.map_known_frontier(block)
+        # Now outline the blocks, backtracking if there are any
+        # unexpected merge failures:
 
-        return merge_frontier
+        remap_needed = False
+
+        while frontier:
+            subblock = next(iter(frontier))
+
+            try:
+                subblock.auto_outline()
+            except UnexpectedMergeFailure as e:
+                # One of the merges that we expected to succeed in
+                # fact failed.
+                frontier.remove_failure(e.i1, e.i2)
+                remap_needed = True
+                # Restart loop for the same frontier...
+            else:
+                sub_frontiers = list(frontier.partition(subblock))
+                if not sub_frontiers:
+                    break
+                else:
+                    assert len(sub_frontiers) == 1
+                    frontier = sub_frontiers[0]
+
+        if remap_needed:
+            # remove_failure()s are not propagated back to the
+            # original frontier, so if any happened, we have to
+            # generate the frontier afresh:
+            frontier = BlockwiseMergeFrontier.map_known_frontier(block)
+
+        return frontier
 
     def __init__(self, block, blocks=None):
         MergeFrontier.__init__(self, block)
@@ -1910,39 +1934,6 @@ class BlockwiseMergeFrontier(MergeFrontier):
 
         unblocked_block = self.get_affected_blocker_block(i1, i2)
         unblocked_block[1, 1].record_blocked(False)
-
-    def auto_fill(self):
-        """Outline this merge frontier to the extent possible.
-
-        Return True iff some progress was made. This method does *not*
-        keep self up to date on any progress; if it returns
-        successfully, you should recompute the frontier from scratch.
-
-        """
-
-        progress_made = False
-        frontier = self
-
-        while frontier:
-            block = next(iter(frontier))
-
-            try:
-                block.auto_outline()
-            except UnexpectedMergeFailure as e:
-                # One of the merges that we expected to succeed in
-                # fact failed.
-                frontier.remove_failure(e.i1, e.i2)
-                # Continue looping...
-            else:
-                progress_made = True
-                sub_frontiers = list(frontier.partition(block))
-                if not sub_frontiers:
-                    break
-                else:
-                    assert len(sub_frontiers) == 1
-                    frontier = sub_frontiers[0]
-
-        return progress_made
 
     def auto_expand(self):
         """Try pushing out one of the blocks on this frontier.
