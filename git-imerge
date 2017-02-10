@@ -1920,24 +1920,29 @@ class BlockwiseMergeFrontier(MergeFrontier):
 
         """
 
-        while self:
-            best_block = min(self, key=lambda block: (block.len1, block.len2))
+        progress_made = False
+        frontier = self
+
+        while frontier:
+            block = next(iter(frontier))
 
             try:
-                best_block.auto_outline()
+                block.auto_outline()
             except UnexpectedMergeFailure as e:
                 # One of the merges that we expected to succeed in
                 # fact failed.
-                self.remove_failure(e.i1, e.i2)
+                frontier.remove_failure(e.i1, e.i2)
                 # Continue looping...
             else:
-                for f in self.partition(best_block):
-                    if f:
-                        f.auto_fill()
+                progress_made = True
+                sub_frontiers = list(frontier.partition(block))
+                if not sub_frontiers:
+                    break
+                else:
+                    assert len(sub_frontiers) == 1
+                    frontier = sub_frontiers[0]
 
-                return True
-
-        return False
+        return progress_made
 
     def auto_expand(self):
         """Try pushing out one of the blocks on this frontier.
