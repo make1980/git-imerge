@@ -2595,12 +2595,15 @@ class MergeState(Block):
         a FrontierBlockedError.  Save the state as progress is
         made."""
 
+        i = 0
         progress_made = False
         try:
             while True:
                 frontier = MergeFrontier.map_known_frontier(self)
                 frontier.auto_expand()
-                self.save()
+                i = i + 1
+                if (i % 100 == 0):
+                    self.save()
                 progress_made = True
         except BlockCompleteError:
             return
